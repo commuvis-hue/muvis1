@@ -36,6 +36,8 @@
 | `accompanist.pause` / `resume` | – | – | 일시정지 / 재개 |
 | `accompanist.stop` | – | – | 정지. `song:ended { completed:false }` 이벤트를 반드시 보냄 |
 | `accompanist.skipInterlude` | – | – | 간주 점프 |
+| `accompanist.setKey` | `{ semitones }` | – | 음정 변경 (−6 ~ +6) |
+| `mixer.set` | `{ music, mic, micOn, echo, guide }` | – | 반주 음량(0~1), 마이크 음량(0~1.5)·켜기, 에코 0~3, 가이드 멜로디 |
 | `camera.list` | – | `CameraInfo[]` | `{ id, label }` 목록 |
 | `recorder.start` | `{ takeId, cameraIds[], maskId }` | – | 카메라별 원본 + 반주·마이크 오디오를 타임코드 동기화해 녹화. 원본은 가면 없이 저장하고 `maskId`는 메타데이터로 기록 |
 | `recorder.stop` | – | `RecordingResult` | `{ takeId, tracks:[{cameraId, uri}], audioUri, durationSec }` |
@@ -50,6 +52,7 @@
 | `song:started` | `{ songNo, durationSec }` | 반주 시작 |
 | `song:progress` | `{ songNo, positionSec, durationSec }` | 0.25~1초 간격 |
 | `song:ended` | `{ songNo, completed }` | 끝까지 재생 시 `completed:true` |
+| `mic:level` | `{ level }` | 마이크 입력 레벨 0~1, 약 10회/초 (노래 화면 레벨 미터) |
 | `error` | `{ message }` | 화면에 오류 알림으로 표시 |
 
 ## 녹화 원본 업로드

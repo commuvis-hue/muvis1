@@ -5,6 +5,8 @@
 export type AgentMode = 'mock' | 'local';
 export type ApiMode = 'mock' | 'http';
 
+const apiModeEnv = process.env.NEXT_PUBLIC_API_MODE === 'http' ? 'http' : 'mock';
+
 export const config = {
   agentMode: (process.env.NEXT_PUBLIC_AGENT_MODE === 'local' ? 'local' : 'mock') as AgentMode,
   agentUrl: process.env.NEXT_PUBLIC_AGENT_URL || 'ws://127.0.0.1:7700',
@@ -12,7 +14,16 @@ export const config = {
   apiBase: process.env.NEXT_PUBLIC_API_BASE || '',
   mobileWebUrl: process.env.NEXT_PUBLIC_MOBILE_WEB_URL || 'https://m.muvis.example.com',
   defaultBoothId: process.env.NEXT_PUBLIC_BOOTH_ID || 'DEMO-BOOTH-01',
-  devPanel: process.env.NEXT_PUBLIC_DEV_PANEL === 'true',
+  /** 시연용 개발 패널. 모의 서버일 때는 기본으로 켜고, 명시적으로 false면 끔 */
+  devPanel:
+    process.env.NEXT_PUBLIC_DEV_PANEL === 'true' ||
+    (process.env.NEXT_PUBLIC_DEV_PANEL !== 'false' && apiModeEnv === 'mock'),
+  /** 키보드처럼 카드번호를 입력하는 USB RF 리더(HID) 입력을 받을지 */
+  rfKeyboard: process.env.NEXT_PUBLIC_RF_KEYBOARD !== 'false',
+  /** 모의 모드에서 반주·가이드 멜로디·마이크 소리를 낼지 */
+  demoAudio: process.env.NEXT_PUBLIC_DEMO_AUDIO !== 'false',
+  /** 마이크 에코 제거·잡음 억제를 끄고 원음으로 (믹서 경유 매장 마이크용, 노트북 스피커는 하울링 주의) */
+  micRaw: process.env.NEXT_PUBLIC_MIC_RAW === 'true',
   demoSongSeconds: Number(process.env.NEXT_PUBLIC_DEMO_SONG_SECONDS || 40),
   /** 모의 장비의 CAM 1에 실제 웹캠 화면을 쓸지 (가면이 내 얼굴에 씌워지는 시연) */
   mockWebcam: process.env.NEXT_PUBLIC_MOCK_WEBCAM !== 'false',

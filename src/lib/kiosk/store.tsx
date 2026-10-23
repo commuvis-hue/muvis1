@@ -5,7 +5,7 @@ import {
   type ReactNode,
 } from 'react';
 import { createAgent } from '@/lib/agent';
-import type { AgentEvent, AgentStatus, CameraInfo, DeviceAgent } from '@/lib/agent';
+import type { AgentEvent, AgentStatus, CameraInfo, DeviceAgent, MixerSettings } from '@/lib/agent';
 import { ApiError, createApi } from '@/lib/api';
 import type { MuvisApi } from '@/lib/api';
 import { getMask } from '@/lib/ar/masks';
@@ -74,6 +74,9 @@ export interface KioskState {
   songsSung: number;
   maskId: string | null;
   maskOffers: MaskOffer[];
+  mixer: MixerSettings;
+  /** 현재 곡 음정 (반음) */
+  key: number;
   /** 이번 이용에서 가면 고르기 화면을 이미 보여줬는지 */
   maskPrompted: boolean;
 }
@@ -104,6 +107,8 @@ const initialState = (boothId: string): KioskState => ({
   songsSung: 0,
   maskId: null,
   maskOffers: [],
+  mixer: { music: 0.8, mic: 0.9, micOn: true, echo: 2, guide: true },
+  key: 0,
   maskPrompted: false,
 });
 
@@ -142,6 +147,7 @@ function reducer(state: KioskState, a: Action): KioskState {
         ...initialState(state.boothId),
         agentStatus: state.agentStatus,
         cameras: state.cameras,
+        mixer: state.mixer,
       };
     case 'patch':
       return { ...state, ...a.patch };
@@ -481,9 +487,11 @@ function useActions(deps: {
         patch({
           pendingSong: null,
           nowPlaying: { song, positionSec: 0, durationSec: song.durationSec, paused: false, takeId },
+          key: 0,
         });
         go('performing', true);
-        await agent.playSong({ songNo: song.no, durationSec: song.durationSec });
+        await agent.setKey(0).catch(() => undefined);
+        await agent.playSong({ songNo: song.no, durationSec: song.durationSec, genre: song.genre });
       } catch (e) {
         if (takeId) await agent.stopRecording().catch(() => undefined);
         patch({ nowPlaying: null, pendingSong: null });
@@ -522,6 +530,19 @@ function useActions(deps: {
         if (!ok) return;
       }
       await agent.stopSong().catch((e) => fail(e));
+    },
+
+    // ── 사운드 (반주기 · 믹서) ──
+    async changeKey(delta: number) {
+      const key = Math.max(-6, Math.min(6, get().key + delta));
+      patch({ key });
+      await agent.setKey(key).catch(() => undefined);
+    },
+
+    async setMixer(p: Partial<MixerSettings>) {
+      const mixer = { ...get().mixer, ...p };
+      patch({ mixer });
+      await agent.setMixer(mixer).catch(() => undefined);
     },
 
     async setLed(source: string) {
@@ -726,6 +747,7 @@ function useActions(deps: {
           patch({ agentStatus: e.status });
           if (e.status === 'online') {
             agent.listCameras().then((cameras) => patch({ cameras })).catch(() => undefined);
+            agent.setMixer(get().mixer).catch(() => undefined);
           }
           if (e.status === 'offline') toast('노래방 장비와 연결이 끊겼습니다', 'error');
           break;
@@ -745,6 +767,9 @@ function useActions(deps: {
           break;
         case 'song:ended':
           void actions.finishSong(e.completed);
+          break;
+        case 'mic:level':
+          // 마이크 레벨은 화면의 MicMeter가 장비 이벤트를 직접 구독해 표시 (전체 렌더링 방지)
           break;
         case 'error':
           toast(e.message, 'error');
@@ -833,6 +858,28 @@ export function KioskProvider({ boothId, children }: { boothId: string; children
       agent.disconnect();
     };
   }, [agent]);
+
+  // USB RF 리더(키보드 입력 방식): 빠르게 들어온 글자 + Enter = 카드번호
+  useEffect(() => {
+    if (!config.rfKeyboard) return;
+    let buf = '';
+    let last = 0;
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return;
+      const now = performance.now();
+      if (now - last > 80) buf = '';
+      last = now;
+      if (e.key === 'Enter') {
+        if (buf.length >= 4) actionsRef.current.onAgentEvent({ type: 'rf:tag', uid: buf });
+        buf = '';
+      } else if (e.key.length === 1) {
+        buf += e.key;
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   // 1초 시계: 남은 시간, 종료 처리, 방치 복귀
   useEffect(() => {

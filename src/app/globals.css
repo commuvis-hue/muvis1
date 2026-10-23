@@ -825,3 +825,34 @@ img, video { display: block; max-width: 100%; }
 
 .just-mirror { position: relative; width: 60rem; aspect-ratio: 16 / 9; display: flex; }
 .just-mirror .program-tag { z-index: 1; }
+
+.demo-login {
+  margin-top: auto;
+  width: 100%;
+  display: grid; gap: 0.6rem; justify-items: center;
+  padding: 1rem;
+  border: 2px dashed var(--amber);
+  border-radius: var(--r-sm);
+}
+.demo-login p { color: var(--amber); font-size: 1rem; }
+
+/* ── 사운드 (음정 · 믹서) ─────────────────────────────── */
+
+.np-controls { margin-bottom: 0.25rem; }
+.sound { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem 0.75rem; padding: 0.9rem; border-radius: var(--r-md); background: var(--panel); border: 1px solid var(--line); }
+.snd { display: grid; gap: 0.25rem; }
+.snd-label { font-size: 0.9rem; color: var(--muted); }
+.snd-step { display: grid; grid-template-columns: 3.25rem 1fr 3.25rem; align-items: center; border-radius: var(--r-sm); background: var(--raised); overflow: hidden; }
+.snd-step button { min-height: 3.25rem; font-size: 1.6rem; font-weight: 700; }
+.snd-step button:active { background: var(--line); }
+.snd-step output { text-align: center; font-weight: 700; font-variant-numeric: tabular-nums; font-size: 1.2rem; }
+.snd-toggle {
+  min-height: 3.25rem; padding: 0 0.8rem;
+  display: flex; align-items: center; gap: 0.45rem;
+  border-radius: var(--r-sm); background: var(--raised); color: var(--muted); font-weight: 700;
+}
+.snd-toggle.is-on { color: var(--text); }
+.micmeter { margin-left: auto; display: flex; gap: 2px; align-items: flex-end; height: 1.2rem; }
+.micmeter i { width: 0.3rem; height: 100%; border-radius: 1px; background: var(--line); }
+.micmeter i.is-on { background: var(--ok); }
+.micmeter i.is-hot { background: var(--red); }

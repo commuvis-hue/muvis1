@@ -1,3 +1,5 @@
+import type { Genre } from '@/lib/types';
+
 /**
  * DeviceAgent — 키오스크 화면이 노래방 장비와 대화하는 유일한 통로.
  *
@@ -35,8 +37,18 @@ export interface RecordingResult {
 
 export interface PlayOptions {
   songNo: string;
-  /** 모의 반주기에서만 사용. 실제 반주기는 곡 길이를 스스로 압니다. */
+  /** 모의 반주기에서만 사용. 실제 반주기는 곡 정보를 스스로 압니다. */
   durationSec?: number;
+  genre?: Genre;
+}
+
+/** 노래방 믹서 설정 (반주 음량, 마이크, 에코, 가이드 멜로디) */
+export interface MixerSettings {
+  music: number;
+  mic: number;
+  micOn: boolean;
+  echo: 0 | 1 | 2 | 3;
+  guide: boolean;
 }
 
 export type AgentEvent =
@@ -45,6 +57,7 @@ export type AgentEvent =
   | { type: 'song:started'; songNo: string; durationSec: number }
   | { type: 'song:progress'; songNo: string; positionSec: number; durationSec: number }
   | { type: 'song:ended'; songNo: string; completed: boolean }
+  | { type: 'mic:level'; level: number }
   | { type: 'error'; message: string };
 
 export interface DeviceAgent {
@@ -60,6 +73,9 @@ export interface DeviceAgent {
   resumeSong(): Promise<void>;
   stopSong(): Promise<void>;
   skipInterlude(): Promise<void>;
+  /** 음정(키) 변경, 반음 단위 −6 ~ +6 */
+  setKey(semitones: number): Promise<void>;
+  setMixer(settings: MixerSettings): Promise<void>;
 
   // 멀티 카메라 · 녹화
   listCameras(): Promise<CameraInfo[]>;

@@ -143,7 +143,12 @@ export class MockApi implements MuvisApi, MockApiControls {
     },
     loginWithRf: async (cardUid: string): Promise<Member> => {
       await wait();
-      const memberId = this.cards.get(cardUid);
+      let memberId = this.cards.get(cardUid);
+      // 시연 모드: 처음 보는 실제 카드는 데모 계정에 연결 (RF-UNKNOWN은 미등록 카드 시험용)
+      if (!memberId && cardUid !== 'RF-UNKNOWN') {
+        memberId = 'm-1001';
+        this.cards.set(cardUid, memberId);
+      }
       if (!memberId) throw new ApiError('UNKNOWN_CARD', '등록되지 않은 RF 카드입니다. 앱에서 카드를 먼저 등록해 주세요.');
       const m = this.member(memberId);
       return { id: m.id, nickname: m.nickname };

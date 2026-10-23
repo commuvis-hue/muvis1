@@ -1,9 +1,10 @@
 import { drawMaskOnFace, getMask } from '@/lib/ar/masks';
 import { detectFaces, loadTracker, PoseSmoother } from '@/lib/ar/tracker';
 import { getWebcam } from '@/lib/ar/webcam';
+import { getDemoAudio } from '@/lib/audio/engine';
 import { config } from '@/lib/config';
 import type {
-  AgentEvent, AgentStatus, CameraInfo, DeviceAgent, MockAgentControls,
+  AgentEvent, AgentStatus, CameraInfo, DeviceAgent, MixerSettings, MockAgentControls,
   PlayOptions, PreviewSource, RecordingResult,
 } from './types';
 
@@ -38,7 +39,12 @@ export class MockAgent implements DeviceAgent, MockAgentControls {
   private detector: Awaited<ReturnType<typeof loadTracker>> = null;
   private smoother = new PoseSmoother();
 
+  /** 모의 반주기 소리 (반주·가이드 멜로디·마이크 모니터) */
+  private audio = config.demoAudio && typeof window !== 'undefined' ? getDemoAudio() : null;
+  private unlockAudio = () => this.audio?.unlock();
+
   connect() {
+    if (typeof window !== 'undefined') window.addEventListener('pointerdown', this.unlockAudio, { passive: true });
     if (this.connectTimer || this.status === 'online') return;
     this.setStatus('connecting');
     this.connectTimer = setTimeout(() => {
@@ -48,6 +54,7 @@ export class MockAgent implements DeviceAgent, MockAgentControls {
   }
 
   disconnect() {
+    if (typeof window !== 'undefined') window.removeEventListener('pointerdown', this.unlockAudio);
     if (this.connectTimer) clearTimeout(this.connectTimer);
     this.connectTimer = null;
     this.clearSong();
@@ -83,27 +90,41 @@ export class MockAgent implements DeviceAgent, MockAgentControls {
   }
 
   // ── 반주기 ─────────────────────────────────────────
-  async playSong({ songNo, durationSec }: PlayOptions) {
+  async playSong({ songNo, durationSec, genre }: PlayOptions) {
     this.ensureOnline();
     this.clearSong();
-    const dur = Math.min(durationSec ?? 200, config.demoSongSeconds);
+    let dur = Math.min(durationSec ?? 200, config.demoSongSeconds);
+    if (this.audio) {
+      // 음원 파일이 있으면 그 길이대로, 없으면 즉석 작곡 반주
+      const info = await this.audio.play({ no: songNo, genre: genre ?? '인디' }, dur);
+      if (info.source === 'file' && info.durationSec) dur = info.durationSec;
+      void this.audio.setMicActive(true);
+    }
     this.song = { no: songNo, pos: 0, dur, paused: false };
     this.emit({ type: 'song:started', songNo, durationSec: dur });
+    let tick = 0;
     this.songTimer = setInterval(() => {
       const s = this.song;
-      if (!s || s.paused) return;
-      s.pos = Math.min(s.dur, s.pos + 0.25);
-      this.emit({ type: 'song:progress', songNo: s.no, positionSec: s.pos, durationSec: s.dur });
+      if (!s) return;
+      tick++;
+      if (this.audio) this.emit({ type: 'mic:level', level: this.audio.micLevel() });
+      if (s.paused) return;
+      s.pos = this.audio?.isPlaying ? Math.min(s.dur, this.audio.position()) : Math.min(s.dur, s.pos + 0.1);
+      if (tick % 3 === 0 || s.pos >= s.dur) {
+        this.emit({ type: 'song:progress', songNo: s.no, positionSec: s.pos, durationSec: s.dur });
+      }
       if (s.pos >= s.dur) this.endSong(true);
-    }, 250);
+    }, 100);
   }
 
   async pauseSong() {
     if (this.song) this.song.paused = true;
+    this.audio?.pause();
   }
 
   async resumeSong() {
     if (this.song) this.song.paused = false;
+    this.audio?.resume();
   }
 
   async stopSong() {
@@ -111,7 +132,17 @@ export class MockAgent implements DeviceAgent, MockAgentControls {
   }
 
   async skipInterlude() {
-    if (this.song) this.song.pos = Math.min(this.song.dur - 1, this.song.pos + 8);
+    if (!this.song) return;
+    this.song.pos = Math.min(this.song.dur - 1, this.song.pos + 8);
+    this.audio?.seek(this.song.pos);
+  }
+
+  async setKey(semitones: number) {
+    this.audio?.setKey(semitones);
+  }
+
+  async setMixer(settings: MixerSettings) {
+    this.audio?.setMixer(settings);
   }
 
   private endSong(completed: boolean) {
@@ -124,6 +155,8 @@ export class MockAgent implements DeviceAgent, MockAgentControls {
     if (this.songTimer) clearInterval(this.songTimer);
     this.songTimer = null;
     this.song = null;
+    this.audio?.stop();
+    void this.audio?.setMicActive(false);
   }
 
   // ── 카메라 ─────────────────────────────────────────

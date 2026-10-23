@@ -7,6 +7,7 @@ import { getMask } from '@/lib/ar/masks';
 import { useKiosk } from '@/lib/kiosk/store';
 import { ArMirror } from '../ArMirror';
 import { CameraView } from '../CameraView';
+import { SoundPanel } from '../SoundPanel';
 import { Icon } from '../Icon';
 import { QueuePanel } from './Browse';
 
@@ -102,6 +103,7 @@ export function PerformingScreen() {
           정지
         </button>
       </div>
+      <SoundPanel />
       {state.endAfterSong && <p className="np-ending">이용 시간이 끝나 이 곡이 마지막 곡입니다</p>}
       <QueuePanel queue={state.queue} compact />
     </div>

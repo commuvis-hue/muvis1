@@ -1,5 +1,5 @@
 import type {
-  AgentEvent, AgentStatus, CameraInfo, DeviceAgent, PlayOptions, PreviewSource, RecordingResult,
+  AgentEvent, AgentStatus, CameraInfo, DeviceAgent, MixerSettings, PlayOptions, PreviewSource, RecordingResult,
 } from './types';
 
 type Pending = { resolve: (v: unknown) => void; reject: (e: Error) => void; timer: ReturnType<typeof setTimeout> };
@@ -132,6 +132,12 @@ export class LocalAgent implements DeviceAgent {
   }
   skipInterlude() {
     return this.call<void>('accompanist.skipInterlude');
+  }
+  setKey(semitones: number) {
+    return this.call<void>('accompanist.setKey', { semitones });
+  }
+  setMixer(settings: MixerSettings) {
+    return this.call<void>('mixer.set', { ...settings });
   }
   listCameras() {
     return this.call<CameraInfo[]>('camera.list');

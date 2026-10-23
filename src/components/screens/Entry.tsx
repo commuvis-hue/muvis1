@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { policy } from '@/lib/config';
 import { pts } from '@/lib/format';
 import { useKiosk } from '@/lib/kiosk/store';
-import type { LoginQr } from '@/lib/api';
+import { mockApiControls, type LoginQr } from '@/lib/api';
 import type { AdSlide } from '@/lib/types';
 import { Icon } from '../Icon';
 import { QrImage } from '../QrImage';
@@ -87,6 +87,7 @@ export function LoginScreen() {
     // actions는 매 렌더 새로 만들어지므로 의존성에서 제외 (최신 값은 내부에서 읽음)
   }, [api, state.boothId, round]);
 
+  const demo = mockApiControls(api);
   const leftSec = qr ? Math.max(0, Math.floor((qr.expiresAt - now) / 1000)) : 0;
   const expired = qr !== null && leftSec === 0;
 
@@ -113,6 +114,14 @@ export function LoginScreen() {
             {expired ? 'QR 유효 시간이 지났습니다' : qr ? `MUVIS 앱 → QR 스캔 · ${leftSec}초 동안 유효` : 'QR 준비 중'}
           </p>
           <p className="login-sub">앱이 없다면 휴대폰 카메라로 찍어 가입부터 할 수 있어요</p>
+          {demo && (
+            <div className="demo-login">
+              <p>시연 모드에서는 MUVIS 앱이 연결되어 있지 않아 QR 승인이 되지 않습니다.</p>
+              <button className="btn btn-primary" onClick={() => actions.rfLogin(demo.demoCardUid)}>
+                데모 계정으로 로그인
+              </button>
+            </div>
+          )}
         </div>
         <div className="login-or" aria-hidden="true">또는</div>
         <div className="login-card">

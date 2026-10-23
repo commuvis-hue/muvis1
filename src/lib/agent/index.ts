@@ -12,5 +12,5 @@ export function mockControls(agent: DeviceAgent): MockAgentControls | null {
 }
 
 export type {
-  AgentEvent, AgentStatus, CameraInfo, DeviceAgent, MockAgentControls, PreviewSource, RecordingResult,
+  AgentEvent, AgentStatus, CameraInfo, DeviceAgent, MixerSettings, MockAgentControls, PreviewSource, RecordingResult,
 } from './types';
