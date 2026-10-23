@@ -1,0 +1,9 @@
+{
+  "name": "MUVIS XR Kiosk",
+  "short_name": "MUVIS",
+  "start_url": "/",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#130B26",
+  "theme_color": "#130B26"
+}

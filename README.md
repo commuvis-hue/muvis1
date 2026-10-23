@@ -1,0 +1,120 @@
+# MUVIS XR 키오스크
+
+MUVIS XR 부스·스테이지의 **터치 모니터 화면**입니다. Next.js로 만들어 Vercel에 배포하고, 노래방 기기에서는 Chrome 키오스크 모드로 띄웁니다.
+
+장비(반주기·카메라·RF 리더·LED)와 서버(회원·M포인트·AI 편집)는 각각 **교체 가능한 연결 계층** 뒤에 있습니다. 지금은 둘 다 **모의(mock)** 로 동작하므로, 배포하자마자 전체 흐름을 시연할 수 있습니다.
+
+```
+[Vercel] 이 프로젝트 (키오스크 화면)
+   │  NEXT_PUBLIC_API_MODE=mock │ http
+   ├──────────────► MockApi (메모리)  │  HttpApi → MUVIS 통합 서버
+   │  NEXT_PUBLIC_AGENT_MODE=mock │ local
+   └──────────────► MockAgent (브라우저 안)  │  LocalAgent → ws://127.0.0.1:7700 (기기 로컬 에이전트)
+```
+
+## 구현된 흐름 (기획서 v1.1 기준)
+
+| 단계 | 화면 | 내용 |
+| --- | --- | --- |
+| 대기 | `attract` | 광고 순환, 터치하면 시작 |
+| 인증 | `login` | 앱 QR 로그인(2분 유효, 자동 갱신 버튼) 또는 RF 카드 태그 |
+| 결제 | `payment` | M포인트로 30분 이용권 결제, 잔액 부족 시 충전 안내 |
+| 모드 | `mode` | XR 스튜디오(녹화+AI) / JUST 노래방 |
+| AR 가면 | `mask` | 웹캠으로 얼굴을 인식해 가면을 바로 씌워 보기, 무료·프리미엄(구매) 가면, 녹화·LED에 같은 가면 적용 |
+| 선곡 | `browse` | 인기곡·신곡·장르별·AI 음원, 초성·곡번호·영문 검색, 예약 목록 |
+| 노래 | `countdown` → `performing` | 3초 카운트다운, 반주 재생, 카메라 3대 동시 녹화, LED 송출 카메라 선택/자동 전환, 일시정지·간주 점프·정지 |
+| AI | `afterSong` → `aiStatus` → `aiPreview` | 완곡 시에만 제작 여부 질문, 진행률, 숏폼/롱폼 미리보기, 업로드(무료 3회 후 차감), 재생성(차감 동의), 실패 시 무료 재시도 |
+| 기타 | `myVideos` `audition` `news` `ads` | 내 뮤직영상, 업로드한 영상으로 오디션 참가, 뉴스, 광고 |
+| 시간 | 상단 바 | 남은 시간, 5분 전 안내, 10분 연장, 만료 시 진행 중인 곡까지만 허용 후 종료 |
+| 리모컨 | 상단 바 | 휴대폰 리모컨 연결 QR, 리모컨 예약·시작·정지 명령 수신 |
+
+모든 결제·차감 요청에는 **멱등 키(Idempotency-Key)** 를 붙여 중복 결제를 막습니다.
+
+## 시작하기
+
+```bash
+npm install
+cp .env.example .env.local
+npm run dev        # http://localhost:3000
+```
+
+여러 부스는 URL로 구분합니다: `https://<도메인>/?booth=GANGNAM-03`
+
+### 시연용 개발 패널
+
+`NEXT_PUBLIC_DEV_PANEL=true` 일 때 **왼쪽 위 MUVIS 로고를 2초간 누르면** 열립니다. QR 승인, RF 카드 태그, 포인트 충전, AI 편집 실패, 리모컨 예약, 장비 끊김, 남은 시간 조정을 직접 일으킬 수 있습니다. 운영 배포에서는 꼭 `false`로 두세요.
+
+## Vercel 배포
+
+1. 이 폴더를 GitHub 저장소에 올립니다.
+2. Vercel → Add New Project → 저장소 선택 (Framework: Next.js 자동 인식).
+3. Environment Variables에 `.env.example`의 값을 넣습니다.
+4. Deploy. 이후 `main`에 푸시할 때마다 모든 매장 기기에 새 화면이 반영됩니다.
+
+> `NEXT_PUBLIC_*` 값은 빌드할 때 번들에 들어가므로, 값을 바꾸면 **재배포**해야 합니다.
+
+## 노래방 기기에 설치
+
+기기에는 Chrome(또는 Chromium)만 있으면 됩니다. `scripts/` 의 실행 스크립트를 부팅 시 자동 실행되도록 등록하세요.
+
+- Windows: `scripts/kiosk-windows.bat` → 시작프로그램 폴더(`shell:startup`)에 바로가기
+- Linux: `scripts/kiosk-linux.sh` → systemd 사용자 서비스 또는 자동 시작
+
+스크립트는 전체 화면·키오스크 모드로 열고, 카메라 권한을 자동 허용하며, 터치 확대·번역 팝업 등을 끕니다. 상단의 `URL`과 `BOOTH` 값만 매장에 맞게 고치면 됩니다.
+
+## AR 가면
+
+복면가왕처럼 노래하는 사람 얼굴에 가면이 따라 붙는 기능입니다. 세 곳에서 동작합니다.
+
+| 어디에 | 누가 합성 | 설명 |
+| --- | --- | --- |
+| 키오스크 착용 미리보기 | 브라우저 (MediaPipe 얼굴 인식) | 가면 고르기 화면과 JUST 모드 노래 화면. 키오스크 전면 웹캠 사용 |
+| LED 송출 · 카메라 미리보기 | 로컬 에이전트 (`ar.setMask`) | 모의 모드에서는 모의 장비가 대신 그립니다 |
+| 최종 뮤직비디오 | AI 편집 서버 (`takes.maskId`) | 녹화 원본은 가면 없이 저장하고, 편집 시 모든 앵글에 같은 가면을 합성 |
+
+얼굴 인식은 눈·코·볼 랜드마크로 위치·크기·기울기·좌우 돌림을 계산해 가면을 씌우며, 최대 2명(듀엣)까지 인식합니다. 처음 모드를 고르면 가면 고르기 화면이 나오고, 이후에는 왼쪽 메뉴의 ‘가면 선택’에서 바꿀 수 있습니다.
+
+**가면 추가하기** — `src/lib/ar/masks.ts`의 `MASKS`에 추가합니다. 샘플 6종(무료 4·프리미엄 2)은 벡터로 그린 오리지널 디자인입니다. 디자이너가 만든 PNG를 쓰려면 `image: { src, leftEye, rightEye }`처럼 이미지 속 두 눈의 픽셀 좌표만 함께 적으면 같은 방식으로 얼굴에 맞춰집니다. 판매 여부와 가격은 서버(`masks.list`)가 정합니다.
+
+> 실제 「복면가왕」 가면 디자인은 MBC의 저작물이라 사용 허락을 받은 경우에만 등록하세요.
+
+**운영 메모** — 녹화용 카메라는 에이전트가 쓰므로 키오스크 미리보기용 웹캠은 따로 두는 것을 권장합니다. 얼굴 인식 모델(약 4MB)은 첫 사용 때 내려받으니, 회선이 불안정한 매장은 `.env.example`의 안내대로 `public/`에 넣어 두세요.
+
+## 실제 장비·서버로 바꾸기
+
+| 바꿀 것 | 할 일 | 문서 |
+| --- | --- | --- |
+| 장비 | 기기에 로컬 에이전트를 설치하고 `NEXT_PUBLIC_AGENT_MODE=local` | `docs/AGENT_PROTOCOL.md` |
+| 서버 | 통합 서버 API를 구현하고 `NEXT_PUBLIC_API_MODE=http` | `docs/API_CONTRACT.md` |
+| 리모컨 실시간 | `HttpApi.remote.subscribe`를 Supabase Realtime·Ably 등으로 교체 | `src/lib/api/httpApi.ts` |
+
+화면 코드는 `DeviceAgent`, `MuvisApi` 인터페이스만 사용하므로 위 교체 시 화면은 수정할 필요가 없습니다.
+
+## 폴더 구조
+
+```
+src/
+  app/                   Next.js 진입점, 전역 스타일, /api/health
+  components/
+    KioskApp.tsx         화면 전환 셸
+    StatusBar / SideRail / Overlays / CameraView / QrImage / Icon
+    screens/             Entry · Browse · Stage · Results · Info
+  lib/
+    kiosk/store.tsx      상태 머신과 모든 흐름(결제·선곡·녹화·AI·시간)
+    agent/               DeviceAgent 인터페이스 · MockAgent · LocalAgent
+    api/                 MuvisApi 인터페이스 · MockApi · HttpApi
+    ar/                  가면 카탈로그·그리기, 얼굴 인식, 웹캠
+    config.ts            환경 변수와 운영 정책 상수
+  data/                  시연용 샘플 곡·콘텐츠 (가상 데이터)
+docs/                    에이전트 프로토콜, 서버 API 계약
+scripts/                 기기 실행 스크립트
+```
+
+## 미확정 사항 (기획서 v1.1 §7·§10)
+
+아래 값은 시연용 가정값이며 서버에서 내려받도록 되어 있습니다.
+
+- 요금: 30분 5,000P · 10분 연장 1,500P · 재생성 1,000P · 추가 업로드 500P · 프리미엄 가면 2,000P (`MockApi`)
+- 무료 업로드 3회의 산정 기준: 모의 서버는 **회원별** 누적으로 계산
+- 편집 실패 시 재시도는 무료로 가정
+- 숏폼·롱폼 목표 길이, 처리 시간, 반주기 곡 번호 체계, 동의 문구
